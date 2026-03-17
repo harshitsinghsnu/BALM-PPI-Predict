@@ -481,8 +481,8 @@ def main():
             help="Upload best_model_fold_N.pth — files up to 4 GB are supported"
         )
         col1, col2 = st.columns(2)
-        pkd_lo = col1.number_input("pKd min", value=2.0, step=0.5)
-        pkd_hi = col2.number_input("pKd max", value=14.0, step=0.5)
+        pkd_lo = col1.number_input("pKd min", value=1.0, step=0.5)
+        pkd_hi = col2.number_input("pKd max", value=16.0, step=0.5)
 
         if weights_file is not None:
             if st.button("⚡ Load Model", use_container_width=True, type="primary"):
