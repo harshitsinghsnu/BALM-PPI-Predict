@@ -1,0 +1,11 @@
+[server]
+maxUploadSize = 4096        # 4 GB — covers any .pth file
+maxMessageSize = 4096       # must match or exceed maxUploadSize
+
+[theme]
+base = "dark"
+backgroundColor = "#080a0d"
+secondaryBackgroundColor = "#0f1218"
+textColor = "#dde4ed"
+primaryColor = "#39ff6e"
+font = "monospace"

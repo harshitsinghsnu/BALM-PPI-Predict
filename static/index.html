@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BALM · Binding Affinity Predictor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<!-- NGL — real molecular viewer (RCSB PDB engine) -->
+<script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+<!-- Plotly for heatmap -->
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+:root{
+  --bg:#080a0d; --sur:#0f1218; --sur2:#161b24; --bdr:#1f2733;
+  --acc:#1fc74c; --acc2:#00c4ff; --hot:#ff4d6d; --warm:#ffd166;
+  --txt:#dde4ed; --mut:#5a6678;
+  --mono:'Space Mono',monospace; --sans:'Syne',sans-serif; --r:6px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--txt);font-family:var(--sans)}
+
+header{height:52px;display:flex;align-items:center;gap:14px;padding:0 22px;background:var(--sur);border-bottom:1px solid var(--bdr);z-index:20;position:relative}
+.logo{font-size:20px;font-weight:800;letter-spacing:-.5px;color:var(--acc)}
+.logo span{color:var(--txt)}
+.sub{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:2px;text-transform:uppercase}
+.badge{margin-left:auto;font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:4px;border:1px solid var(--bdr);color:var(--mut);background:var(--sur2);transition:.2s}
+.badge.ready{border-color:var(--acc);color:var(--acc);box-shadow:0 0 14px rgba(57,255,110,.2)}
+
+main{display:grid;grid-template-columns:400px 1fr;height:calc(100vh - 52px)}
+
+/* LEFT */
+#left{background:var(--sur);border-right:1px solid var(--bdr);overflow-y:auto;display:flex;flex-direction:column}
+#left::-webkit-scrollbar{width:3px}
+#left::-webkit-scrollbar-thumb{background:var(--bdr)}
+.sec{padding:16px 18px;border-bottom:1px solid var(--bdr)}
+.sec-lbl{font-family:var(--mono);font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--acc);display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--bdr)}
+label{display:block;font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;margin-top:10px}
+label:first-child{margin-top:0}
+input[type=text],input[type=number],textarea{width:100%;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);color:var(--txt);font-family:var(--mono);font-size:12px;padding:9px 11px;outline:none;resize:none;transition:border-color .2s,box-shadow .2s}
+input:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(57,255,110,.1)}
+textarea{min-height:78px;line-height:1.6}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{cursor:pointer;font-family:var(--sans);font-weight:600;border:none;border-radius:var(--r);transition:.15s}
+.btn-p{width:100%;padding:12px;background:var(--acc);color:#040804;font-size:12px;letter-spacing:1px;text-transform:uppercase;margin-top:8px}
+.btn-p:hover{background:#5dff88;transform:translateY(-1px);box-shadow:0 0 18px rgba(57,255,110,.25)}
+.btn-p:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+.btn-s{padding:8px 14px;background:var(--sur2);color:var(--txt);border:1px solid var(--bdr);font-size:11px;width:100%;text-align:left;margin-bottom:5px}
+.btn-s:hover{border-color:var(--acc2);color:var(--acc2)}
+.af-row{display:flex;gap:8px;margin-top:6px}
+.af-row input{flex:1}
+.af-row button{padding:9px 14px;font-family:var(--mono);font-size:11px;background:var(--sur2);color:var(--acc2);border:1px solid var(--bdr);border-radius:var(--r);white-space:nowrap}
+.af-row button:hover{border-color:var(--acc2)}
+
+/* result card */
+#res-card{display:none;flex-direction:column;gap:10px}
+.mrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mbox{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:12px 14px;text-align:center}
+.mbox .v{font-family:var(--mono);font-size:22px;font-weight:700;letter-spacing:-1px;line-height:1;margin-bottom:4px}
+.mbox .l{font-family:var(--mono);font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase}
+.vg{color:var(--acc)}.vb{color:var(--acc2)}
+.bar-wrap{background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:10px 13px}
+.bar-lbl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--mut);margin-bottom:6px}
+.bar-track{height:7px;background:var(--bdr);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#00c4ff,#39ff6e,#ffd166,#ff4d6d);transition:width 1.2s cubic-bezier(.22,1,.36,1)}
+#log{font-family:var(--mono);font-size:11px;color:var(--mut);background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r);padding:9px 11px;max-height:90px;overflow-y:auto;line-height:1.85}
+.lok{color:var(--acc)}.lerr{color:var(--hot)}.lwrn{color:var(--warm)}
+
+/* RIGHT — 3 rows */
+#right{display:grid;grid-template-rows:1fr 200px 200px;overflow:hidden}
+
+/* Row 1: 3D viewer */
+#struct-pane{position:relative;background:#060809;overflow:hidden}
+#ngl-vp{width:100%;height:100%}
+.pane-top{position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(180deg,rgba(6,8,9,.95) 60%,transparent);pointer-events:none}
+.pane-top>*{pointer-events:auto}
+.pane-lbl{font-family:var(--mono);font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--acc)}
+.pane-sub{font-family:var(--mono);font-size:10px;color:var(--mut)}
+.struct-btns{position:absolute;bottom:10px;right:12px;z-index:10;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.sbtn{padding:5px 11px;font-family:var(--mono);font-size:10px;background:rgba(15,18,24,.88);border:1px solid var(--bdr);color:var(--mut);border-radius:4px}
+.sbtn:hover{border-color:var(--acc2);color:var(--acc2)}
+.sbtn.active{border-color:var(--acc);color:var(--acc)}
+#struct-legend{position:absolute;bottom:10px;left:12px;z-index:10;font-family:var(--mono);font-size:10px;color:var(--mut);background:rgba(15,18,24,.88);border:1px solid var(--bdr);border-radius:4px;padding:7px 11px;line-height:2;display:none}
+.ldot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+#struct-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--mut);font-family:var(--mono);font-size:11px;opacity:.4;pointer-events:none}
+
+/* Row 2: IG residue strip */
+#ig-strip-pane{border-top:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden}
+.ig-hdr{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-shrink:0}
+.ig-tabs{display:flex;gap:4px}
+.ig-tab{padding:3px 11px;font-family:var(--mono);font-size:10px;border-radius:3px;border:1px solid var(--bdr);background:transparent;color:var(--mut)}
+.ig-tab.active{background:var(--acc);border-color:var(--acc);color:#040804}
+.ig-grad-lbl{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;color:var(--mut)}
+.ig-grad{width:70px;height:6px;border-radius:3px;background:linear-gradient(90deg,#060809,#39ff6e)}
+.ig-scroll{flex:1;overflow-x:auto;overflow-y:hidden;padding:8px 14px;display:flex;align-items:flex-start;gap:14px}
+.ig-scroll::-webkit-scrollbar{height:3px}
+.ig-scroll::-webkit-scrollbar-thumb{background:var(--bdr)}
+#ig-empty{font-family:var(--mono);font-size:11px;color:var(--mut);opacity:.5;align-self:center;margin:auto}
+.res-strip{display:flex;gap:2px;flex-shrink:0}
+.res{display:inline-flex;flex-direction:column;align-items:center;width:18px;flex-shrink:0;cursor:pointer;position:relative}
+.res-aa{width:18px;height:20px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;border-radius:3px;transition:transform .1s}
+.res:hover .res-aa{transform:scale(1.4);z-index:10}
+.res-idx{font-family:var(--mono);font-size:8px;color:var(--mut);margin-top:1px}
+.res-tip{display:none;position:absolute;bottom:110%;left:50%;transform:translateX(-50%);background:var(--sur2);color:var(--txt);border:1px solid var(--bdr);border-radius:4px;padding:3px 8px;font-family:var(--mono);font-size:10px;white-space:nowrap;z-index:50;pointer-events:none}
+.res:hover .res-tip{display:block}
+.topk{flex-shrink:0;width:190px}
+.topk-ttl{font-family:var(--mono);font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:7px}
+.topk-row{display:flex;align-items:center;gap:5px;margin-bottom:4px;font-family:var(--mono);font-size:10px}
+.topk-nm{width:38px;color:var(--mut);text-align:right;flex-shrink:0}
+.topk-track{flex:1;height:11px;background:var(--sur2);border-radius:3px;overflow:hidden;cursor:pointer}
+.topk-fill{height:100%;border-radius:3px;background:var(--acc);transition:width .9s cubic-bezier(.22,1,.36,1)}
+.topk-v{width:32px;color:var(--acc);text-align:right;flex-shrink:0}
+
+/* Row 3: Heatmap */
+#heatmap-pane{border-top:1px solid var(--bdr);display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+.hm-hdr{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--sur);border-bottom:1px solid var(--bdr);flex-shrink:0}
+#heatmap-div{flex:1;min-height:0}
+#heatmap-empty{font-family:var(--mono);font-size:11px;color:var(--mut);opacity:.5;display:flex;align-items:center;justify-content:center;flex:1}
+
+/* overlay */
+#overlay{display:none;position:fixed;inset:0;background:rgba(8,10,13,.82);backdrop-filter:blur(5px);z-index:100;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.spin{width:48px;height:48px;border:3px solid var(--bdr);border-top-color:var(--acc);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.spin-msg{font-family:var(--mono);font-size:12px;color:var(--acc);letter-spacing:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div><div class="logo">BALM<span>·predict</span></div><div class="sub">ESM-2 · LoRA · Integrated Gradients</div></div>
+  <div class="badge" id="badge">NO MODEL LOADED</div>
+</header>
+
+<div id="overlay"><div class="spin"></div><div class="spin-msg" id="spin-msg">LOADING…</div></div>
+
+<main>
+<!-- ═══ LEFT ═══ -->
+<div id="left">
+
+  <div class="sec">
+    <div class="sec-lbl">01 · Model Weights</div>
+    <label>Checkpoint path (.pth)</label>
+    <input type="text" id="weights" placeholder="D:\BALM_Fineclone\...\best_model_fold_1.pth">
+    <div class="row2" style="margin-top:8px">
+      <div><label>pKd min</label><input type="number" id="pkd-lo" value="2" step="0.5"></div>
+      <div><label>pKd max</label><input type="number" id="pkd-hi" value="14" step="0.5"></div>
+    </div>
+    <button class="btn-p" onclick="loadModel()">Load Model Weights</button>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">02 · Sequences</div>
+    <label>Target Protein — Seq A</label>
+    <textarea id="seq-a" placeholder="Paste raw sequence or FASTA…"></textarea>
+    <label>Binder Protein — Seq B</label>
+    <textarea id="seq-b" placeholder="Paste raw sequence or FASTA…"></textarea>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:9px">
+      <input type="checkbox" id="run-ig" checked style="accent-color:var(--acc);width:13px;height:13px">
+      <span style="font-family:var(--mono);font-size:10px;color:var(--mut)">RUN INTEGRATED GRADIENTS</span>
+    </div>
+    <button class="btn-p" id="btn-predict" disabled onclick="predict()">Run Prediction</button>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">03 · Structure (AlphaFold / PDB)</div>
+    <label>UniProt ID — Target (Seq A)</label>
+    <div class="af-row">
+      <input type="text" id="af-a" placeholder="e.g. P0DTD1">
+      <button onclick="loadAF('a')">Fetch AF</button>
+    </div>
+    <label>UniProt ID — Binder (Seq B)</label>
+    <div class="af-row">
+      <input type="text" id="af-b" placeholder="e.g. P0DTD3">
+      <button onclick="loadAF('b')">Fetch AF</button>
+    </div>
+    <label style="margin-top:10px">Local PDB files (A / B)</label>
+    <div class="row2" style="margin-top:4px">
+      <input type="file" id="pdb-a" accept=".pdb,.cif" style="font-family:var(--mono);font-size:10px;color:var(--mut);padding:6px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r)" onchange="loadPDB('a',this)">
+      <input type="file" id="pdb-b" accept=".pdb,.cif" style="font-family:var(--mono);font-size:10px;color:var(--mut);padding:6px;background:var(--sur2);border:1px solid var(--bdr);border-radius:var(--r)" onchange="loadPDB('b',this)">
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px">
+      <button class="sbtn" style="flex:1;padding:8px" onclick="applyIG()">🎨 Apply IG to Structure</button>
+      <button class="sbtn" style="flex:1;padding:8px" onclick="resetColors()">↺ Reset Colors</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">04 · Results</div>
+    <div id="log"><span class="lok">// Ready. Load a model to begin.</span></div>
+    <div id="res-card" style="margin-top:12px">
+      <div class="mrow">
+        <div class="mbox"><div class="v vg" id="r-pkd">—</div><div class="l">Predicted pKd</div></div>
+        <div class="mbox"><div class="v vb" id="r-cos">—</div><div class="l">Cosine Sim</div></div>
+      </div>
+      <div class="bar-wrap">
+        <div class="bar-lbl"><span>Weak (2)</span><span id="r-str">—</span><span>Strong (14)</span></div>
+        <div class="bar-track"><div class="bar-fill" id="r-bar" style="width:0"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">05 · Examples</div>
+    <button class="btn-s" onclick="eg('cr6261')">CR6261 × Influenza HA</button>
+    <button class="btn-s" onclick="eg('cr9114')">CR9114 × Influenza HA</button>
+    <button class="btn-s" onclick="eg('blank')">Clear</button>
+  </div>
+
+</div>
+
+<!-- ═══ RIGHT ═══ -->
+<div id="right">
+
+  <!-- Row 1: 3D Structure -->
+  <div id="struct-pane">
+    <div class="pane-top">
+      <span class="pane-lbl">3D Structure · NGL Viewer</span>
+      <span class="pane-sub" id="struct-sub">load an AlphaFold structure or local PDB</span>
+    </div>
+    <div id="ngl-vp"></div>
+    <div id="struct-ph">
+      <svg width="38" height="38" viewBox="0 0 38 38" fill="none"><circle cx="19" cy="19" r="17" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="19" r="3.5" fill="currentColor" opacity=".5"/><circle cx="19" cy="10" r="3.5" fill="currentColor" opacity=".5"/><circle cx="28" cy="19" r="3.5" fill="currentColor" opacity=".5"/><circle cx="19" cy="28" r="3.5" fill="currentColor" opacity=".5"/><line x1="13.5" y1="19" x2="15.5" y2="19" stroke="currentColor" stroke-width="1.5"/><line x1="19" y1="13.5" x2="19" y2="15.5" stroke="currentColor" stroke-width="1.5"/><line x1="22.5" y1="19" x2="24.5" y2="19" stroke="currentColor" stroke-width="1.5"/><line x1="19" y1="22.5" x2="19" y2="24.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span>Enter a UniProt ID → Fetch AF, or upload a local PDB</span>
+      <span style="font-size:9px">IG residue colours will apply automatically after prediction</span>
+    </div>
+    <div id="struct-legend"></div>
+    <div class="struct-btns">
+      <button class="sbtn active" id="rep-cartoon"  onclick="setRep('cartoon')">CARTOON</button>
+      <button class="sbtn"        id="rep-surface"  onclick="setRep('surface')">SURFACE</button>
+      <button class="sbtn"        id="rep-ballstick" onclick="setRep('ball+stick')">BALL+STICK</button>
+      <button class="sbtn"        onclick="if(stage)stage.autoView()">RESET VIEW</button>
+    </div>
+  </div>
+
+  <!-- Row 2: IG residue strip -->
+  <div id="ig-strip-pane">
+    <div class="ig-hdr">
+      <span class="pane-lbl" style="font-size:9px;letter-spacing:2px">Residue Attribution · IG</span>
+      <div class="ig-tabs">
+        <button class="ig-tab active" id="tab-a" onclick="switchTab('a')">Target (A)</button>
+        <button class="ig-tab"        id="tab-b" onclick="switchTab('b')">Binder (B)</button>
+      </div>
+      <div class="ig-grad-lbl"><span>Low</span><div class="ig-grad"></div><span>High</span></div>
+    </div>
+    <div class="ig-scroll" id="ig-scroll">
+      <div id="ig-empty">Run a prediction with Integrated Gradients enabled</div>
+    </div>
+  </div>
+
+  <!-- Row 3: Heatmap -->
+  <div id="heatmap-pane">
+    <div class="ig-hdr">
+      <span class="pane-lbl" style="font-size:9px;letter-spacing:2px">IG Attribution Heatmap</span>
+      <div class="ig-tabs" style="margin-left:10px">
+        <button class="ig-tab active" id="hm-tab-a" onclick="switchHmTab('a')">Target (A)</button>
+        <button class="ig-tab"        id="hm-tab-b" onclick="switchHmTab('b')">Binder (B)</button>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--mut);margin-left:auto">Click residue to zoom in 3D</span>
+    </div>
+    <div id="heatmap-div"></div>
+    <div id="heatmap-empty">Run a prediction to generate the heatmap</div>
+  </div>
+
+</div>
+</main>
+
+<script>
+// ══════════════════════════════════════════
+//  GLOBALS
+// ══════════════════════════════════════════
+const API = '';
+let modelLoaded = false;
+let lastResult  = null;
+let curTab      = 'a';
+let curHmTab    = 'a';
+let curRep      = 'cartoon';
+let stage       = null;
+let compA       = null;
+let compB       = null;
+let igSchemeA   = null;
+let igSchemeB   = null;
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', async () => {
+  initNGL();
+  window.addEventListener('resize', () => stage && stage.handleResize());
+  try {
+    const r = await fetch(`${API}/api/status`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      const d = await r.json();
+      log('Flask server reachable ✓');
+      if (d.model_loaded) {
+        modelLoaded = true;
+        document.getElementById('btn-predict').disabled = false;
+        setBadge(`MODEL READY · ${d.device}`);
+        log(`Model already on ${d.device}`);
+      }
+    }
+  } catch { log('⚠ Flask not reachable — run "python app.py" first', 'err'); }
+});
+
+// ══════════════════════════════════════════
+//  NGL INIT
+// ══════════════════════════════════════════
+function initNGL() {
+  stage = new NGL.Stage('ngl-vp', {
+    backgroundColor: '#060809',
+    quality: 'medium',
+    tooltip: true
+  });
+}
+
+// ══════════════════════════════════════════
+//  LOAD AlphaFold
+// ══════════════════════════════════════════
+async function loadAF(chain) {
+  const uid = document.getElementById(`af-${chain}`).value.trim().toUpperCase();
+  if (!uid) { log(`No UniProt ID for chain ${chain.toUpperCase()}`, 'wrn'); return; }
+  const url = `https://alphafold.ebi.ac.uk/files/AF-${uid}-F1-model_v4.pdb`;
+  log(`Fetching AlphaFold ${uid}…`);
+  spin(true, `LOADING AF-${uid}…`);
+  try {
+    await loadCompFromUrl(chain, url, uid);
+    log(`AlphaFold ${uid} loaded ✓`);
+  } catch(e) { log(`AF load failed: ${e.message}`, 'err'); }
+  finally { spin(false); }
+}
+
+// ══════════════════════════════════════════
+//  LOAD local PDB
+// ══════════════════════════════════════════
+async function loadPDB(chain, input) {
+  const file = input.files[0];
+  if (!file) return;
+  log(`Loading ${file.name}…`);
+  spin(true, 'LOADING PDB…');
+  try {
+    const text = await file.text();
+    const blob = new Blob([text], { type: 'text/plain' });
+    const burl = URL.createObjectURL(blob);
+    await loadCompFromUrl(chain, burl, file.name, true);
+    URL.revokeObjectURL(burl);
+    log(`${file.name} loaded ✓`);
+  } catch(e) { log(`PDB load failed: ${e.message}`, 'err'); }
+  finally { spin(false); }
+}
+
+async function loadCompFromUrl(chain, url, name, isBlob=false) {
+  if (chain === 'a' && compA) { stage.removeComponent(compA); compA = null; }
+  if (chain === 'b' && compB) { stage.removeComponent(compB); compB = null; }
+
+  const comp = await stage.loadFile(url, { ext: 'pdb', name });
+
+  if (chain === 'a') {
+    compA = comp;
+    // Default: colour by pLDDT (b-factor) for AlphaFold
+    comp.addRepresentation(curRep, {
+      colorScheme: 'bfactor', colorScale: 'RdYlGn', colorReverse: false
+    });
+  } else {
+    compB = comp;
+    comp.addRepresentation(curRep, { colorScheme: 'chainindex', opacity: 0.85 });
+  }
+
+  stage.autoView();
+  document.getElementById('struct-ph').style.display = 'none';
+  document.getElementById('struct-sub').textContent =
+    `${compA ? compA.name : '—'}  +  ${compB ? compB.name : '—'}`;
+
+  updateLegend();
+
+  // Re-apply IG colours if already predicted
+  if (lastResult && (lastResult.ig_target || lastResult.ig_binder)) {
+    applyIG();
+  }
+}
+
+// ══════════════════════════════════════════
+//  IG → STRUCTURE COLOUR
+// ══════════════════════════════════════════
+function igColor(score) {
+  // dark navy → teal → acid green
+  const s = Math.max(0, Math.min(1, score));
+  const r = Math.round(10  + s * 47);
+  const g = Math.round(18  + s * 237);
+  const b = Math.round(40  + s * 70);
+  return (r << 16) | (g << 8) | b;
+}
+
+function applyIG() {
+  if (!lastResult) { log('No prediction yet — run prediction first.', 'wrn'); return; }
+
+  if (compA && lastResult.ig_target) {
+    const scores = lastResult.ig_target;
+    const schemeId = NGL.ColormakerRegistry.addScheme(function() {
+      this.atomColor = atom => {
+        const i = atom.resno - 1;
+        return (i >= 0 && i < scores.length) ? igColor(scores[i]) : 0x1a2a3a;
+      };
+    });
+    compA.removeAllRepresentations();
+    compA.addRepresentation(curRep, { color: schemeId });
+    log('IG colours applied to Target structure ✓');
+  }
+  if (compB && lastResult.ig_binder) {
+    const scores = lastResult.ig_binder;
+    const schemeId = NGL.ColormakerRegistry.addScheme(function() {
+      this.atomColor = atom => {
+        const i = atom.resno - 1;
+        return (i >= 0 && i < scores.length) ? igColor(scores[i]) : 0x1a2a3a;
+      };
+    });
+    compB.removeAllRepresentations();
+    compB.addRepresentation(curRep, { color: schemeId, opacity: 0.92 });
+    log('IG colours applied to Binder structure ✓');
+  }
+  updateLegend(true);
+}
+
+function resetColors() {
+  if (compA) {
+    compA.removeAllRepresentations();
+    compA.addRepresentation(curRep, { colorScheme: 'bfactor', colorScale: 'RdYlGn' });
+  }
+  if (compB) {
+    compB.removeAllRepresentations();
+    compB.addRepresentation(curRep, { colorScheme: 'chainindex', opacity: 0.85 });
+  }
+  updateLegend(false);
+  log('Structure colours reset to pLDDT / chain index.');
+}
+
+function setRep(rep) {
+  curRep = rep;
+  ['cartoon','surface','ball+stick'].forEach(r => {
+    const id = 'rep-' + r.replace('+','').replace('-','');
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', r === rep);
+  });
+  resetColors();
+}
+
+function highlightResidue(comp, resno) {
+  if (!comp || !stage) return;
+  const existing = comp.reprList.filter(r => r.name === '__hl');
+  existing.forEach(r => comp.removeRepresentation(r));
+  const hl = comp.addRepresentation('ball+stick', {
+    sele: `:${resno}`, color: '#ffd166', aspectRatio: 2.5, name: '__hl'
+  });
+  try {
+    stage.animationControls.zoomMove(
+      comp.getCenter(`:${resno}`),
+      stage.viewer.camera.position.distanceTo(comp.getCenter(`:${resno}`)) * 0.35,
+      700
+    );
+  } catch {}
+  setTimeout(() => { try { comp.removeRepresentation(hl); } catch {} }, 3000);
+}
+
+function updateLegend(igMode = false) {
+  const el = document.getElementById('struct-legend');
+  if (!compA && !compB) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '';
+  if (compA) el.innerHTML += `<div><span class="ldot" style="background:${igMode?'#39ff6e':'#66ff99'}"></span>Chain A · ${compA.name}${igMode?' (IG coloured)':' (pLDDT)'}</div>`;
+  if (compB) el.innerHTML += `<div><span class="ldot" style="background:${igMode?'#00c4ff':'#4499cc'}"></span>Chain B · ${compB.name}${igMode?' (IG coloured)':' (chain)'}</div>`;
+  if (igMode) el.innerHTML += '<div style="margin-top:4px;opacity:.6">dark=low · bright green=high IG</div>';
+}
+
+// ══════════════════════════════════════════
+//  LOAD MODEL
+// ══════════════════════════════════════════
+async function loadModel() {
+  const weights = document.getElementById('weights').value.trim();
+  const lo = parseFloat(document.getElementById('pkd-lo').value);
+  const hi = parseFloat(document.getElementById('pkd-hi').value);
+  if (!weights) { log('Specify a weights path first.', 'wrn'); return; }
+  spin(true, 'LOADING ESM-2 + LoRA…');
+  log(`Loading: ${weights}`);
+  try {
+    let res, data;
+    try {
+      res  = await fetch(`${API}/api/load_model`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weights_path: weights, pkd_lower: lo, pkd_upper: hi })
+      });
+      data = await res.json();
+    } catch(e) { throw new Error(`Cannot reach Flask.\nRun: python app.py\n(${e.message})`); }
+    if (!res.ok) throw new Error((data.error||'Error')+(data.traceback?'\n'+data.traceback:''));
+    modelLoaded = true;
+    document.getElementById('btn-predict').disabled = false;
+    setBadge(`MODEL READY · ${data.device||''}`);
+    log(`Model loaded ✓  ${data.message}`);
+    if (data.missing   > 0) log(`  ⚠ ${data.missing} missing keys`, 'wrn');
+    if (data.unexpected > 0) log(`  ⚠ ${data.unexpected} unexpected keys`, 'wrn');
+  } catch(e) {
+    e.message.split('\n').forEach((l,i) => l.trim() && log((i?'  ':'ERR: ')+l,'err'));
+  } finally { spin(false); }
+}
+
+// ══════════════════════════════════════════
+//  PREDICT
+// ══════════════════════════════════════════
+async function predict() {
+  const seqA = clean(document.getElementById('seq-a').value);
+  const seqB = clean(document.getElementById('seq-b').value);
+  const runIg = document.getElementById('run-ig').checked;
+  if (!seqA||!seqB) { log('Both sequences required.','wrn'); return; }
+  spin(true, runIg ? 'PREDICTING + INTEGRATED GRADIENTS…' : 'PREDICTING…');
+  log(`A: ${seqA.length} aa  B: ${seqB.length} aa`);
+  if (runIg) log('Running IG (30–120 s CPU, <5 s GPU)…');
+  try {
+    let res, data;
+    try {
+      res  = await fetch(`${API}/api/predict`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sequence_a: seqA, sequence_b: seqB, run_ig: runIg })
+      });
+      data = await res.json();
+    } catch(e) { throw new Error(`Server unreachable: ${e.message}`); }
+    if (!res.ok) throw new Error((data.error||'Error')+(data.traceback?'\n'+data.traceback:''));
+
+    lastResult = { seqA, seqB, ...data };
+
+    // metrics
+    document.getElementById('r-pkd').textContent = data.pkd.toFixed(3);
+    document.getElementById('r-cos').textContent = data.cosine.toFixed(4);
+    document.getElementById('res-card').style.display = 'flex';
+    const lo  = parseFloat(document.getElementById('pkd-lo').value);
+    const hi  = parseFloat(document.getElementById('pkd-hi').value);
+    const pct = Math.max(0, Math.min(100, ((data.pkd - lo)/(hi - lo))*100));
+    document.getElementById('r-bar').style.width = `${pct}%`;
+    document.getElementById('r-str').textContent =
+      pct < 30 ? 'Weak' : pct < 55 ? 'Moderate' : pct < 75 ? 'Strong' : 'Very Strong';
+
+    log(`✓ pKd = ${data.pkd.toFixed(3)}  cosine = ${data.cosine.toFixed(4)}`);
+    if (data.ig_warning) log(`⚠ ${data.ig_warning}`, 'wrn');
+
+    if (data.ig_target || data.ig_binder) {
+      log('Integrated Gradients computed ✓');
+      renderStrip(seqA, seqB, data.ig_target, data.ig_binder);
+      renderHeatmap(seqA, seqB, data.ig_target, data.ig_binder);
+      if (compA || compB) applyIG();
+    }
+  } catch(e) {
+    e.message.split('\n').forEach((l,i) => l.trim() && log((i?'  ':'ERR: ')+l,'err'));
+  } finally { spin(false); }
+}
+
+// ══════════════════════════════════════════
+//  IG RESIDUE STRIP
+// ══════════════════════════════════════════
+function switchTab(t) {
+  curTab = t;
+  document.getElementById('tab-a').classList.toggle('active', t==='a');
+  document.getElementById('tab-b').classList.toggle('active', t==='b');
+  if (lastResult) renderStrip(lastResult.seqA, lastResult.seqB, lastResult.ig_target, lastResult.ig_binder);
+}
+
+function renderStrip(seqA, seqB, igA, igB) {
+  const scroll = document.getElementById('ig-scroll');
+  document.getElementById('ig-empty').style.display = 'none';
+  scroll.innerHTML = '';
+
+  const seq  = curTab === 'a' ? seqA : seqB;
+  const attr = curTab === 'a' ? igA  : igB;
+
+  if (!attr) {
+    scroll.innerHTML = '<span style="font-family:var(--mono);font-size:11px;color:var(--mut)">IG not available for this chain.</span>';
+    return;
+  }
+
+  // residue strip
+  const strip = document.createElement('div');
+  strip.className = 'res-strip';
+  [...seq].forEach((aa, i) => {
+    const s = attr[i] || 0;
+    const cell = document.createElement('div');
+    cell.className = 'res';
+    const r = Math.round(10 + s*47), g = Math.round(18 + s*237), b = Math.round(40 + s*70);
+    const box = document.createElement('div');
+    box.className = 'res-aa';
+    box.style.background = `rgb(${r},${g},${b})`;
+    box.style.color = s > 0.5 ? '#040804' : '#dde4ed';
+    box.textContent = aa;
+    const idx = document.createElement('div');
+    idx.className = 'res-idx';
+    if ((i+1) % 10 === 0) idx.textContent = i+1;
+    const tip = document.createElement('div');
+    tip.className = 'res-tip';
+    tip.textContent = `${aa}${i+1}  IG: ${s.toFixed(3)}`;
+    cell.appendChild(box); cell.appendChild(idx); cell.appendChild(tip);
+    cell.addEventListener('click', () => {
+      const comp = curTab === 'a' ? compA : compB;
+      if (comp) highlightResidue(comp, i+1);
+    });
+    strip.appendChild(cell);
+  });
+  scroll.appendChild(strip);
+
+  // top-10 chart
+  const topk = document.createElement('div');
+  topk.className = 'topk';
+  topk.innerHTML = '<div class="topk-ttl">Top 10 Residues</div>';
+  const sorted = attr.map((v,i)=>({aa:seq[i],idx:i+1,s:v})).sort((a,b)=>b.s-a.s).slice(0,10);
+  const mx = sorted[0]?.s || 1;
+  sorted.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'topk-row';
+    row.innerHTML = `<span class="topk-nm">${item.aa}${item.idx}</span>
+      <div class="topk-track"><div class="topk-fill" style="width:${(item.s/mx)*100}%"></div></div>
+      <span class="topk-v">${item.s.toFixed(3)}</span>`;
+    row.querySelector('.topk-track').addEventListener('click', () => {
+      const comp = curTab === 'a' ? compA : compB;
+      if (comp) highlightResidue(comp, item.idx);
+    });
+    topk.appendChild(row);
+  });
+  scroll.appendChild(topk);
+}
+
+// ══════════════════════════════════════════
+//  PLOTLY HEATMAP
+// ══════════════════════════════════════════
+function switchHmTab(t) {
+  curHmTab = t;
+  document.getElementById('hm-tab-a').classList.toggle('active', t==='a');
+  document.getElementById('hm-tab-b').classList.toggle('active', t==='b');
+  if (lastResult) renderHeatmap(lastResult.seqA, lastResult.seqB, lastResult.ig_target, lastResult.ig_binder);
+}
+
+function renderHeatmap(seqA, seqB, igA, igB) {
+  const seq  = curHmTab === 'a' ? seqA : seqB;
+  const attr = curHmTab === 'a' ? igA  : igB;
+  const div  = document.getElementById('heatmap-div');
+  const empty = document.getElementById('heatmap-empty');
+
+  if (!attr) { empty.style.display='flex'; div.style.display='none'; return; }
+  empty.style.display = 'none';
+  div.style.display   = 'block';
+
+  // Reshape into 2D grid: rows of 50 residues
+  const W = 50;
+  const rows = [];
+  const rowLabels = [];
+  const colLabels = Array.from({length: W}, (_,i) => i+1);
+  const hoverText = [];
+
+  for (let r = 0; r * W < seq.length; r++) {
+    const row = [];
+    const htRow = [];
+    for (let c = 0; c < W; c++) {
+      const idx = r * W + c;
+      if (idx < seq.length) {
+        row.push(attr[idx]);
+        htRow.push(`${seq[idx]}${idx+1}<br>IG: ${attr[idx].toFixed(3)}`);
+      } else {
+        row.push(null);
+        htRow.push('');
+      }
+    }
+    rows.push(row);
+    hoverText.push(htRow);
+    rowLabels.push(`${r*W+1}–${Math.min((r+1)*W, seq.length)}`);
+  }
+
+  const paneH = document.getElementById('heatmap-pane').clientHeight - 36;
+
+  Plotly.react(div, [{
+    type: 'heatmap',
+    z: rows,
+    text: hoverText,
+    hoverinfo: 'text',
+    colorscale: [
+      [0.0,  '#060809'],
+      [0.15, '#0a1a2a'],
+      [0.35, '#0d3a3a'],
+      [0.55, '#116633'],
+      [0.75, '#22cc55'],
+      [1.0,  '#39ff6e']
+    ],
+    zmin: 0, zmax: 1,
+    xgap: 1, ygap: 1,
+    showscale: true,
+    colorbar: {
+      thickness: 12, len: 0.8, x: 1.01,
+      tickfont: { family: 'Space Mono', size: 9, color: '#5a6678' },
+      title: { text: 'IG Score', side: 'right', font: { family: 'Space Mono', size: 9, color: '#5a6678' } }
+    }
+  }], {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#0a0c10',
+    margin: { t: 8, b: 28, l: 52, r: 56 },
+    height: paneH,
+    xaxis: {
+      tickfont: { family: 'Space Mono', size: 8, color: '#5a6678' },
+      tickvals: Array.from({length:5},(_,i)=>Math.round(i*W/4)),
+      ticktext: Array.from({length:5},(_,i)=>String(Math.round(i*W/4)+1)),
+      gridcolor: '#1f2733', gridwidth: 1, showgrid: false,
+      title: { text: 'Residue position', font: { family: 'Space Mono', size: 9, color: '#5a6678' } }
+    },
+    yaxis: {
+      tickfont: { family: 'Space Mono', size: 8, color: '#5a6678' },
+      tickvals: Array.from({length: rows.length},(_,i)=>i),
+      ticktext: rowLabels,
+      gridcolor: '#1f2733'
+    }
+  }, { responsive: true, displayModeBar: false });
+
+  // Click on heatmap cell → highlight in 3D
+  div.on('plotly_click', evd => {
+    const pt  = evd.points[0];
+    const idx = pt.y * W + pt.x;
+    if (idx < seq.length) {
+      const comp = curHmTab === 'a' ? compA : compB;
+      if (comp) highlightResidue(comp, idx + 1);
+    }
+  });
+}
+
+// ══════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════
+function clean(s) { return s.replace(/^>.*$/mg,'').replace(/[^A-Za-z]/g,'').toUpperCase(); }
+function log(msg,t='ok') {
+  const e=document.getElementById('log');
+  const c=t==='err'?'lerr':t==='wrn'?'lwrn':'lok';
+  e.innerHTML+=`<br><span class="${c}">› ${msg}</span>`;
+  e.scrollTop=e.scrollHeight;
+}
+function spin(on,msg='') {
+  document.getElementById('overlay').style.display=on?'flex':'none';
+  if(msg)document.getElementById('spin-msg').textContent=msg;
+}
+function setBadge(t) {
+  const b=document.getElementById('badge');
+  b.textContent=t; b.classList.add('ready');
+}
+
+const EGS = {
+  cr6261:{
+    a:'QVQLVQSGAEVKKPGASVKVSCKASGYTFTSYWMHWVRQAPGQGLEWIGYINPYNDVTHYNQKFKDRVTITVDKSTSTAYMELSSLRSEDTAVYYCARGYDILTGYYRYGMDYWGQGTLVTVSS',
+    b:'MKTIIALSYIFCLVFA'
+  },
+  cr9114:{
+    a:'EVQLVESGGGLVQPGGSLRLSCAASGFTFSSYAMSWVRQAPGKGLEWVSAISGSGGSTYYPDSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCAKDRLSITIRPRYYGLDVWGQGTTVTVSS',
+    b:'MKTIIALSYIFCLVFAQKIPGQTKVNKTVTGENLTEYFNVKAVLNQVQLIIQSANSVTARIDGSQSVSVTGAKYGESIFKELSG'
+  },
+  blank:{a:'',b:''}
+};
+function eg(k) {
+  document.getElementById('seq-a').value=EGS[k].a;
+  document.getElementById('seq-b').value=EGS[k].b;
+  log(`Example "${k}" loaded.`);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+# BALM-LoRA Prediction Web Tool — Python Requirements
+# Install with: pip install -r requirements.txt
+
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# PyTorch — install the right CUDA build from https://pytorch.org/
+torch>=2.0.0
+# torchvision  # not needed unless you add image inputs
+
+# HuggingFace
+transformers>=4.40.0
+peft>=0.10.0
+
+# Attribution
+captum>=0.7.0
+
+# Data / utils
+numpy>=1.24.0
+scipy>=1.10.0
+biopython>=1.81
