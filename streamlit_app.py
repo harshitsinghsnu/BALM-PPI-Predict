@@ -508,10 +508,10 @@ def main():
 
         # ── Structure source ─────────────────────────────────────────────────
         st.markdown('<div class="section-header">02 · Structure Source</div>', unsafe_allow_html=True)
-        #st.caption("Optional — for 3D visualisation")
+        st.caption("Optional — for 3D visualisation")
 
-        #uniprot_a = st.text_input("UniProt ID — Target (A)", placeholder="e.g. P0DTD1")
-        #uniprot_b = st.text_input("UniProt ID — Binder (B)",  placeholder="e.g. P0DTD3")
+        uniprot_a = st.text_input("UniProt ID — Target (A)", placeholder="e.g. P0DTD1")
+        uniprot_b = st.text_input("UniProt ID — Binder (B)",  placeholder="e.g. P0DTD3")
 
         pdb_file_a = st.file_uploader("Local PDB — Target (A)", type=["pdb", "cif"], key="pdb_up_a")
         pdb_file_b = st.file_uploader("Local PDB — Binder (B)",  type=["pdb", "cif"], key="pdb_up_b")
