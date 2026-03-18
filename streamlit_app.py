@@ -456,7 +456,7 @@ def main():
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
-      <span style="font-size:2rem;font-weight:800;color:#39ff6e;letter-spacing:-1px">BALM<span style="color:#dde4ed">·predict</span></span>
+      <span style="font-size:2rem;font-weight:800;color:#39ff6e;letter-spacing:-1px">BALM-PPI<span style="color:#dde4ed">·predict</span></span>
       <span style="font-family:monospace;font-size:0.65rem;color:#5a6678;letter-spacing:3px;text-transform:uppercase">ESM-2 · LoRA · Integrated Gradients</span>
     </div>
     <hr style="border-color:#1f2733;margin-bottom:1rem">
