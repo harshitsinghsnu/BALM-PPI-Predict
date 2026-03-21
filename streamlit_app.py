@@ -531,30 +531,6 @@ def main():
                 st.error(f"❌ Loading failed: {e}")
                 st.code(traceback.format_exc(), language="python")
 
-        weights_file = st.file_uploader(
-            "Checkpoint (.pth / .pt / .bin)",
-            type=["pth", "pt", "bin"],
-            help="Upload best_model_fold_N.pth — files up to 4 GB are supported"
-        )
-        col1, col2 = st.columns(2)
-        pkd_lo = col1.number_input("pKd min", value=1.0, step=0.5)
-        pkd_hi = col2.number_input("pKd max", value=16.0, step=0.5)
-
-        if weights_file is not None:
-            if st.button("⚡ Load Model", use_container_width=True, type="primary"):
-                with st.spinner("Building ESM-2 + LoRA architecture…"):
-                    try:
-                        model, device, n_miss, n_unexp = build_and_load_model(
-                            weights_file.read(), pkd_lo, pkd_hi
-                        )
-                        st.session_state.model  = model
-                        st.session_state.device = str(device)
-                        st.success(f"✅ Loaded on **{device}**  |  missing={n_miss}  unexpected={n_unexp}")
-                    except Exception as e:
-                        st.error(f"❌ {e}")
-                        st.code(traceback.format_exc(), language="python")
-        else:
-            st.info("⬆ Upload a .pth file to begin")
 
         if st.session_state.model:
             st.markdown(f'<div class="status-ok">● MODEL READY · {st.session_state.device}</div>',
