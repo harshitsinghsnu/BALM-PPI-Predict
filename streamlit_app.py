@@ -7,7 +7,7 @@ No local server needed. Deploy to Streamlit Community Cloud for free.
 Run locally:  streamlit run streamlit_app.py
 """
 
-from __future__ import annotations
+from __future__ import annotations 
 import io
 import os
 import sys
