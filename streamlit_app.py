@@ -16,7 +16,7 @@ import traceback
 
 import numpy as np
 import streamlit as st
-
+import requests
 # ── Page config (must be first Streamlit call) ────────────────────────────────
 st.set_page_config(
     page_title="BALM-PPI·predict",
@@ -89,6 +89,16 @@ def _patch_packaging():
 
 _patch_packaging()
 
+DEFAULT_MODEL_URL = "https://huggingface.co/Harshit494/BALM-PPI/resolve/main/best_model_fold_1.pth"
+
+@st.cache_data(show_spinner="Downloading default weights from Hugging Face (this may take a minute)...")
+def download_default_weights(url: str) -> bytes:
+    """Downloads weights from a URL and returns the bytes."""
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
+    # Using a buffer to show progress could be done, 
+    # but for simplicity, we return the content.
+    return response.content
 
 # ═══════════════════════════════════════════════════
 #  MODEL ARCHITECTURE (identical to training)
@@ -474,6 +484,52 @@ def main():
     with st.sidebar:
         st.markdown('<div class="section-header">01 · Model Weights</div>', unsafe_allow_html=True)
         st.caption("Upload your trained .pth checkpoint (up to 4 GB supported)")
+
+        model_source = st.radio(
+            "Select Model Source",
+            ["Default (Hugging Face)", "Upload Custom (.pth)"],
+            help="Choose whether to use the pre-trained weights from Hugging Face or upload your own."
+        )
+        weights_bytes = None
+        
+        if model_source == "Upload Custom (.pth)":
+            weights_file = st.file_uploader(
+                "Checkpoint (.pth / .pt / .bin)",
+                type=["pth", "pt", "bin"],
+                help="Upload your trained model file."
+            )
+            if weights_file:
+                weights_bytes = weights_file.read()
+        else:
+            st.info(f"Using weights from: Harshit494/BALM-PPI")
+
+        col1, col2 = st.columns(2)
+        pkd_lo = col1.number_input("pKd min", value=1.0, step=0.5, key="pkd_input_min_sidebar")
+        pkd_hi = col2.number_input("pKd max", value=16.0, step=0.5, key="pkd_input_max_sidebar")
+
+        # Updated Load Button Logic
+        if st.button("⚡ Load Model", use_container_width=True, type="primary"):
+            try:
+                # Determine which bytes to use
+                if model_source == "Default (Hugging Face)":
+                    weights_to_load = download_default_weights(DEFAULT_MODEL_URL)
+                else:
+                    if weights_bytes is None:
+                        st.error("Please upload a file first.")
+                        return
+                    weights_to_load = weights_bytes
+
+                with st.spinner("Building ESM-2 + LoRA architecture…"):
+                    model, device, n_miss, n_unexp = build_and_load_model(
+                        weights_to_load, pkd_lo, pkd_hi
+                    )
+                    st.session_state.model  = model
+                    st.session_state.device = str(device)
+                    st.success(f"✅ Loaded on **{device}**")
+                    if n_miss > 0: st.caption(f"Missing keys: {n_miss}")
+            except Exception as e:
+                st.error(f"❌ Loading failed: {e}")
+                st.code(traceback.format_exc(), language="python")
 
         weights_file = st.file_uploader(
             "Checkpoint (.pth / .pt / .bin)",
