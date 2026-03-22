@@ -471,8 +471,8 @@ def main():
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
-      <span style="font-size:5rem;font-weight:800;color:#39ff6e;letter-spacing:-1px; -webkit-text-stroke: 2px black; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">BALM-PPI<span style="color:Black">-predict</span></span>
-      <span style="font-family:monospace;font-size:2rem;color:#5a6678;letter-spacing:3px;text-transform:uppercase">    ESM-2 · LoRA · Integrated Gradients</span>
+      <span style="font-size:2.5rem;font-weight:800;color:#39ff6e;letter-spacing:-1px; -webkit-text-stroke: 2px black; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">BALM-PPI<span style="color:Black">-predict</span></span>
+      <span style="font-family:monospace;font-size:1.5rem;color:#5a6678;letter-spacing:3px;text-transform:uppercase">    ESM-2 · LoRA · Integrated Gradients</span>
     </div>
     <hr style="border-color:#1f2733;margin-bottom:1rem">
     """, unsafe_allow_html=True)
@@ -588,15 +588,17 @@ def main():
     # ── Input sequences ───────────────────────────────────────────────────────
     col_a, col_b = st.columns(2)
     with col_a:
-        st.markdown('<div class="section-header">Target Protein — Seq A</div>', unsafe_allow_html=True)
-        seq_a_raw = st.text_area("", value=eg_vals["a"], height=100,
-                                  placeholder="Paste FASTA or raw amino acid sequence…",
-                                  key="seq_a_input", label_visibility="collapsed")
+        with st.container(border=True):
+            st.markdown('<div class="section-header">Target Protein — Seq A</div>', unsafe_allow_html=True)
+            seq_a_raw = st.text_area("", value=eg_vals["a"], height=100,
+                                    placeholder="Paste FASTA or raw amino acid sequence…",
+                                    key="seq_a_input", label_visibility="collapsed")
     with col_b:
-        st.markdown('<div class="section-header">Binder Protein — Seq B</div>', unsafe_allow_html=True)
-        seq_b_raw = st.text_area("", value=eg_vals["b"], height=100,
-                                  placeholder="Paste FASTA or raw amino acid sequence…",
-                                  key="seq_b_input", label_visibility="collapsed")
+        with st.container(border=True):         
+            st.markdown('<div class="section-header">Binder Protein — Seq B</div>', unsafe_allow_html=True)
+            seq_b_raw = st.text_area("", value=eg_vals["b"], height=100,
+                                    placeholder="Paste FASTA or raw amino acid sequence…",
+                                    key="seq_b_input", label_visibility="collapsed")
 
     def clean(s):
         import re
