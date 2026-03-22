@@ -108,28 +108,24 @@ def download_default_weights(url: str) -> bytes:
 # ═══════════════════════════════════════════════════
 #  MODEL ARCHITECTURE (identical to training)
 # ═══════════════════════════════════════════════════
-@st.cache_resource(show_spinner="Loading ESM-2 base model…")
+@st.cache_resource(show_spinner="Loading ESM-2 base model...")
 def _load_esm_base():
-    """Cache the heavy ESM-2 base model so it's only downloaded once."""
     _patch_packaging()
-    from transformers.models.esm.modeling_esm import EsmModel
-    from transformers.models.esm.tokenization_esm import EsmTokenizer
-    base = EsmModel.from_pretrained("facebook/esm2_t33_650M_UR50D")
-    tok  = EsmTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
+    from transformers import EsmModel, EsmTokenizer
+    import torch
+    model_name = "facebook/esm2_t33_650M_UR50D" # Your current model
+    
+    base = EsmModel.from_pretrained(model_name, torch_dtype=torch.float32)
+    tok  = EsmTokenizer.from_pretrained(model_name)
     return base, tok
 
 
 def build_and_load_model(weights_bytes: bytes, pkd_lower: float, pkd_upper: float):
-    """
-    Build BALMForLoRAFinetuning, load uploaded weights, return (model, device).
-    Weights are passed as raw bytes from st.file_uploader.
-    """
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
     from peft import LoraConfig, get_peft_model, TaskType
-    import copy
-
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ── Projection head ───────────────────────────────────────────────────────
@@ -193,12 +189,14 @@ def build_and_load_model(weights_bytes: bytes, pkd_lower: float, pkd_upper: floa
         r=8, lora_alpha=16, lora_dropout=0.1, bias="none",
         task_type=TaskType.FEATURE_EXTRACTION,
         target_modules=["key", "query", "value"])
+    
     peft_esm = get_peft_model(base_esm, lora_cfg)
 
     model = BALMForLoRAFinetuning(
         esm_model=peft_esm, esm_tokenizer=tok,
         projected_size=256, projected_dropout=0.1,
         pkd_bounds=(pkd_lower, pkd_upper))
+
 
     # ── Load weights: write to temp file so torch.load handles 2GB+ safely ────
     # Using BytesIO on a 2GB file doubles RAM usage; temp file avoids this.
@@ -209,6 +207,11 @@ def build_and_load_model(weights_bytes: bytes, pkd_lower: float, pkd_upper: floa
         tmp.flush()
         tmp.close()
         raw_state = torch.load(tmp.name, map_location=device, weights_only=False)
+        result = model.load_state_dict(raw_state, strict=False)
+        del raw_state
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
     finally:
         try: os.unlink(tmp.name)
         except: pass
