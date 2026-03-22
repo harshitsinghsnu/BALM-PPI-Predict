@@ -32,7 +32,7 @@ st.markdown("""
 :root { --acc: #39ff6e; --acc2: #00c4ff; --hot: #ff4d6d; }
 
 [data-testid="stSidebar"] {
-    background: #0f1218;
+    background: white;
     border-right: 1px solid #1f2733;
 }
 [data-testid="stSidebar"] * { font-family: 'Space Mono', monospace !important; }
@@ -52,14 +52,19 @@ st.markdown("""
 .status-wrn { color: #ffd166; font-family: monospace; font-size: 0.8rem; }
 
 .section-header {
-    font-family: monospace; font-size: 0.7rem; letter-spacing: 3px;
+    font-family: monospace; font-size: 1rem; letter-spacing: 3px;
     text-transform: uppercase; color: #39ff6e;
     border-bottom: 1px solid #1f2733; padding-bottom: 6px; margin-bottom: 12px;
+    -webkit-text-stroke: 0.5px black;
+    
+    border-bottom: 1px solid #1f2733; 
+    padding-bottom: 6px; 
+    margin-bottom: 12px;
 }
 .res-cell {
     display: inline-flex; align-items: center; justify-content: center;
     width: 20px; height: 22px; border-radius: 3px;
-    font-family: monospace; font-size: 10px; font-weight: bold;
+    font-family: monospace; font-size: 13px; font-weight: bold;
     margin: 1px; cursor: default;
 }
 </style>
@@ -466,8 +471,8 @@ def main():
     # ── Header ────────────────────────────────────────────────────────────────
     st.markdown("""
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
-      <span style="font-size:2rem;font-weight:800;color:#39ff6e;letter-spacing:-1px">BALM-PPI<span style="color:#dde4ed">·predict</span></span>
-      <span style="font-family:monospace;font-size:0.65rem;color:#5a6678;letter-spacing:3px;text-transform:uppercase">ESM-2 · LoRA · Integrated Gradients</span>
+      <span style="font-size:5rem;font-weight:800;color:#39ff6e;letter-spacing:-1px; -webkit-text-stroke: 2px black; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">BALM-PPI<span style="color:Black">-predict</span></span>
+      <span style="font-family:monospace;font-size:2rem;color:#5a6678;letter-spacing:3px;text-transform:uppercase">    ESM-2 · LoRA · Integrated Gradients</span>
     </div>
     <hr style="border-color:#1f2733;margin-bottom:1rem">
     """, unsafe_allow_html=True)
@@ -759,7 +764,7 @@ def main():
                             title=dict(text="Top 10 Contributing Residues",
                                        font=dict(family="Space Mono", size=11, color="#5a6678")),
                             paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="#0a0c10",
+                            plot_bgcolor="#fefeff",
                             height=260,
                             margin=dict(t=30, b=20, l=55, r=20),
                             xaxis=dict(
@@ -797,7 +802,7 @@ def main():
                             title=dict(text="Top 10 Contributing Residues",
                                        font=dict(family="Space Mono", size=11, color="#5a6678")),
                             paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="#0a0c10",
+                            plot_bgcolor="#f8f8f8",
                             height=260,
                             margin=dict(t=30, b=20, l=55, r=20),
                             xaxis=dict(
