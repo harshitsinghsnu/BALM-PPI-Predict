@@ -1,5 +1,5 @@
 """
-BALM·predict — Streamlit App 
+BALM·predict — Streamlit App
 ================================
 Users upload their .pth model weights directly in the browser.
 No local server needed. Deploy to Streamlit Community Cloud for free.
@@ -7,7 +7,7 @@ No local server needed. Deploy to Streamlit Community Cloud for free.
 Run locally:  streamlit run streamlit_app.py
 """
 
-from __future__ import annotations 
+from __future__ import annotations
 import io
 import os
 import sys
