@@ -4,8 +4,8 @@ maxMessageSize = 4096       # must match or exceed maxUploadSize
 
 [theme]
 base = "dark"
-backgroundColor = "#080a0d"
-secondaryBackgroundColor = "#0f1218"
-textColor = "#dde4ed"
+backgroundColor = "#f1f4f8"
+secondaryBackgroundColor = "#f5f6f8"
+textColor = "#000000"
 primaryColor = "#39ff6e"
-font = "monospace" 
+font = "monospace"
