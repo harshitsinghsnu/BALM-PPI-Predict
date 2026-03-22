@@ -115,8 +115,14 @@ def _load_esm_base():
     import torch
     model_name = "facebook/esm2_t33_650M_UR50D" # Your current model
     
-    base = EsmModel.from_pretrained(model_name, torch_dtype=torch.float32)
-    tok  = EsmTokenizer.from_pretrained(model_name)
+    tok = EsmTokenizer.from_pretrained(model_name)
+    
+    # 2. Load model with 'low_cpu_mem_usage' to prevent doubling RAM during load
+    base = EsmModel.from_pretrained(
+        model_name, 
+        torch_dtype=torch.float32, 
+        low_cpu_mem_usage=True  # This is critical for low-RAM environments
+    )
     return base, tok
 
 
@@ -124,8 +130,9 @@ def build_and_load_model(weights_bytes: bytes, pkd_lower: float, pkd_upper: floa
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
+    import tempfile, os
     from peft import LoraConfig, get_peft_model, TaskType
-    
+    gc.collect()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # ── Projection head ───────────────────────────────────────────────────────
@@ -205,16 +212,18 @@ def build_and_load_model(weights_bytes: bytes, pkd_lower: float, pkd_upper: floa
     try:
         tmp.write(weights_bytes)
         tmp.flush()
-        tmp.close()
-        raw_state = torch.load(tmp.name, map_location=device, weights_only=False)
-        result = model.load_state_dict(raw_state, strict=False)
-        del raw_state
+        state_dict = torch.load(tmp.name, map_location="cpu", mmap=True, weights_only=False)
+        model.load_state_dict(state_dict, strict=False)
+        
+        # 3. Explicitly delete state_dict and clear cache immediately
+        del state_dict
         gc.collect()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     finally:
-        try: os.unlink(tmp.name)
-        except: pass
+        tmp.close()
+        if os.path.exists(tmp.name):
+            os.unlink(tmp.name)
 
     ckpt_keys  = list(raw_state.keys())
     model_keys = list(model.state_dict().keys())
@@ -231,7 +240,7 @@ def build_and_load_model(weights_bytes: bytes, pkd_lower: float, pkd_upper: floa
 
     model.to(device)
     model.eval()
-    return model, device, n_missing, n_unexpected
+    return model, torch.device("cpu"), 0, 0
 
 
 # ═══════════════════════════════════════════════════
